@@ -810,6 +810,7 @@ namespace Spine.Unity.Editor {
 		float cameraOrthoGoal = 1;
 		Vector3 cameraPositionGoal = new Vector3(0, 0, -10);
 		double cameraAdjustEndFrame = 0;
+		bool requiresCameraFit = true;
 
 		List<Spine.Event> currentAnimationEvents = new List<Spine.Event>();
 		List<float> currentAnimationEventTimes = new List<float>();
@@ -917,7 +918,7 @@ namespace Spine.Unity.Editor {
 
 					if (this.ActiveTrack != null) cameraAdjustEndFrame = EditorApplication.timeSinceStartup
 							+ skeletonAnimation.AnimationState.GetTrack(0).Alpha;
-					AdjustCameraGoals();
+					requiresCameraFit = !TryAdjustCameraGoals();
 				} catch {
 					DestroyPreviewGameObject();
 				}
@@ -950,7 +951,7 @@ namespace Spine.Unity.Editor {
 				return null;
 
 			RefreshOnNextUpdate();
-			AdjustCameraGoals();
+			TryAdjustCameraGoals();
 			c.orthographicSize = cameraOrthoGoal / 2;
 			c.transform.position = cameraPositionGoal;
 			previewRenderUtility.BeginStaticPreview(new Rect(0, 0, width, height));
@@ -976,6 +977,13 @@ namespace Spine.Unity.Editor {
 					skeletonAnimation.Update(deltaTime);
 					animationLastTime = current;
 					skeletonAnimation.Renderer.LateUpdate();
+				}
+
+				if (requiresCameraFit && TryAdjustCameraGoals()) {
+					Camera previewCamera = this.PreviewUtilityCamera;
+					previewCamera.orthographicSize = cameraOrthoGoal;
+					previewCamera.transform.position = cameraPositionGoal;
+					requiresCameraFit = false;
 				}
 
 				Camera thisPreviewUtilityCamera = this.PreviewUtilityCamera;
@@ -1009,7 +1017,7 @@ namespace Spine.Unity.Editor {
 				return;
 
 			if (CurrentTime < cameraAdjustEndFrame)
-				AdjustCameraGoals();
+				TryAdjustCameraGoals();
 
 			lastCameraPositionGoal = cameraPositionGoal;
 			lastCameraOrthoGoal = cameraOrthoGoal;
@@ -1029,12 +1037,16 @@ namespace Spine.Unity.Editor {
 			}
 		}
 
-		void AdjustCameraGoals () {
-			if (previewGameObject == null) return;
+		bool TryAdjustCameraGoals () {
+			if (previewGameObject == null) return false;
 
 			Bounds bounds = previewGameObject.GetComponent<Renderer>().bounds;
-			cameraOrthoGoal = bounds.size.y;
+			float height = bounds.size.y;
+			if (height <= 0f || float.IsNaN(height) || float.IsInfinity(height)) return false;
+
+			cameraOrthoGoal = height;
 			cameraPositionGoal = bounds.center + new Vector3(0, 0, -10f);
+			return true;
 		}
 
 		void HandleMouseScroll (Rect position) {
