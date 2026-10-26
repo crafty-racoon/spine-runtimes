@@ -278,6 +278,15 @@ namespace Spine.Unity.Editor {
 			settings = AssetDatabase.LoadAssetAtPath<SpinePreferences>(SPINE_SETTINGS_ASSET_PATH);
 			if (settings == null)
 				settings = FindSpinePreferences();
+			// During the first import after deleting Library, the file can exist before
+			// AssetDatabase has imported it. Never replace a project's saved settings
+			// with a new asset containing the defaults in that case.
+			if (settings == null && System.IO.File.Exists(System.IO.Path.Combine(Application.dataPath, "Editor/SpineSettings.asset"))) {
+				AssetDatabase.ImportAsset(SPINE_SETTINGS_ASSET_PATH, ImportAssetOptions.ForceSynchronousImport);
+				settings = AssetDatabase.LoadAssetAtPath<SpinePreferences>(SPINE_SETTINGS_ASSET_PATH);
+				if (settings == null)
+					throw new System.InvalidOperationException("The existing Spine settings asset could not be loaded; refusing to overwrite it: " + SPINE_SETTINGS_ASSET_PATH);
+			}
 			if (settings == null) {
 				settings = ScriptableObject.CreateInstance<SpinePreferences>();
 				SpineEditorUtilities.OldPreferences.CopyOldToNewPreferences(ref settings);
